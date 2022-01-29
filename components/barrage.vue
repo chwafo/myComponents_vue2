@@ -1,21 +1,21 @@
 <template>
-  <div class="z_barrage-container">
+  <div class="z_barrage-container" ref="container">
     <canvas
-      ref="canvasContainer"
-      :width="containerWidth"
-      :height="containerHeight"
+      ref="canvasMeasure"
+      :width="canvasRealWidth"
+      :height="canvasRealHeight"
       style="display: none"
     />
-    <div class="z_container" :style="{ height: containerHeight / 2 + 'px' }">
+    <div class="z_container" :style="{ height: canvasDisplayHeight + 'px' }">
       <canvas
         id="canvas"
         ref="canvas"
         class="z_barrage"
-        :width="containerWidth"
-        :height="containerHeight"
+        :width="canvasRealWidth"
+        :height="canvasRealHeight"
         :style="{
-          width: containerWidth / 2 + 'px',
-          height: containerHeight / 2 + 'px',
+          width: canvasDisplayWidth + 'px',
+          height: canvasDisplayHeight + 'px',
         }"
       />
     </div>
@@ -23,11 +23,23 @@
 </template>
 
 <script>
-const timesIconUTF8 = "\u00D7";
+const timesIconUTF8 = "\u00D7"; // 乘号
 
 export default {
   name: "Barrage",
   props: {
+    scale: {
+      type: Number,
+      default: 2,
+    }, // 画布实际尺寸 ： 画布显示尺寸
+    canvasDisplayWidth: {
+      type: Number,
+      default: 0,
+    },
+    canvasDisplayHeight: {
+      type: Number,
+      default: 0,
+    },
     barrageList: {
       type: Array,
       default: () => [],
@@ -42,7 +54,7 @@ export default {
     },
     channels: {
       type: Number,
-      default: 2,
+      default: 0,
     },
     channelsDelay: {
       type: Array,
@@ -56,12 +68,8 @@ export default {
     },
     barrageHeight: {
       type: Number,
-      default: 68,
-    },
-    screenPercent: {
-      type: Number,
-      default: 0.3,
-    },
+      default: 34,
+    }, // 弹幕高度
     borderColor: {
       type: String,
       default: "",
@@ -82,26 +90,32 @@ export default {
     fontSize: {
       type: [Number],
       default: 18,
-    },
+    }, // 弹幕字号
     channelGap: {
       type: [Number],
-      default: 40,
-    },
+      default: 20,
+    }, // 轨道之间的间距
     paddingTop: {
       type: [Number],
-      default: 20,
-    },
+      default: 10,
+    }, // 画布的上内边距
     borderWidth: {
       type: [Number],
-      default: 2,
-    },
+      default: 1,
+    }, // 弹幕的边框宽度
     iconTextDistance: {
       type: [Number],
-      default: 5,
+      default: 2,
+    }, // icon与文本的距离
+    barrageGap: {
+      type: Number,
+      default: 10,
     },
   },
   data() {
     return {
+      ctx: null,
+      ctx1: null,
       newBarrageArray: [], // 新增弹幕之后的总弹幕
       barrageArray: [],
       barrageQueue: [],
@@ -112,6 +126,33 @@ export default {
     };
   },
   computed: {
+    canvasRealWidth() {
+      return (this.canvasDisplayWidth || this.containerWidth) * this.scale;
+    },
+    canvasRealHeight() {
+      return (this.canvasDisplayHeight || this.containerHeight) * this.scale;
+    },
+    realChannelGap() {
+      return this.channelGap * this.scale;
+    },
+    realPaddingTop() {
+      return this.paddingTop * this.scale;
+    },
+    realBorderWidth() {
+      return this.borderWidth * this.scale;
+    },
+    halfBorderWidth() {
+      return this.realBorderWidth / 2;
+    },
+    realIconTextDistance() {
+      return this.iconTextDistance * this.scale;
+    },
+    realBarrageHeight() {
+      return this.barrageHeight * this.scale;
+    },
+    realBarrageGap() {
+      return this.barrageGap * this.scale;
+    },
     minChannelDelayIndex() {
       return this.channelsDelay.reduce((minIndex, nextValue, nextIndex) => {
         if (nextValue <= this.channelsDelay[minIndex]) {
@@ -121,22 +162,20 @@ export default {
       }, 0);
     },
     barrageInitX() {
-      return this.containerWidth + this.barrageHeight;
+      // return this.canvasRealWidth + this.realBarrageHeight;
+      return this.canvasRealWidth + this.radius + this.realBarrageGap;
     },
-    innerFontSize() {
-      return this.fontSize * 2;
+    realFontSize() {
+      return this.fontSize * this.scale;
     },
     font() {
-      return `${this.innerFontSize}px PingFangSC-Regular`;
+      return `${this.realFontSize}px PingFangSC-Regular`;
     },
     diameter() {
-      return this.barrageHeight;
+      return this.realBarrageHeight;
     },
     radius() {
       return this.diameter / 2;
-    },
-    halfBorderWidth() {
-      return this.borderWidth / 2;
     },
   },
   watch: {
@@ -153,20 +192,20 @@ export default {
     },
   },
   mounted() {
-    this.containerWidth = document.body.clientWidth * 2;
-    this.containerHeight =
-      window.screen.height * this.screenPercent > 2 * this.barrageHeight
-        ? window.screen.height * this.screenPercent
-        : this.barrageHeight + this.innerFontSize; // 设定总高度
-    const maxChannels = Math.floor(
-      this.containerHeight / (this.barrageHeight + this.innerFontSize)
-    ); // 总高度对应的轨道数
-    this.barrageChannels = maxChannels < this.channels ? maxChannels : this.channels; 
-    this.ctx = this.$refs.canvas.getContext("2d");
-    this.ctx1 = this.$refs.canvasContainer.getContext("2d");
-    this.barrageClickEvent();
+    this.init();
   },
   methods: {
+    init() {
+      this.containerWidth = this.$refs.container.innerWidth;
+      this.containerHeight = this.$refs.container.innerHeight;
+      const maxChannels = Math.floor(
+        (this.canvasRealHeight - this.realPaddingTop) / (this.realBarrageHeight + this.realChannelGap)
+      ); // 总高度对应的轨道
+      this.barrageChannels = this.channels ? (maxChannels < this.channels ? maxChannels : this.channels) : maxChannels;
+      this.ctx = this.$refs.canvas.getContext("2d");
+      this.ctx1 = this.$refs.canvasMeasure.getContext("2d");
+      this.barrageClickEvent();
+    },
     measureText(text = "") {
       this.ctx1.font = this.font;
       return this.ctx1.measureText(text);
@@ -223,7 +262,8 @@ export default {
       }
 
       const width =
-        contentWidth + (barrage.icon ? barrage.iconR * 2 + this.iconTextDistance : 0) + countWidth;
+        contentWidth + (barrage.icon ? barrage.iconR * 2 + this.realIconTextDistance : 0) + countWidth;
+        console.log('contentWidth', contentWidth);
       return {
         width,
         contentWidth,
@@ -284,7 +324,7 @@ export default {
      * 渲染
      */
     render() {
-      this.ctx.clearRect(0, 0, this.containerWidth, this.containerHeight);
+      this.ctx.clearRect(0, 0, this.canvasRealWidth, this.canvasRealHeight);
       this.ctx.font = this.font;
       this.draw();
       window.requestAnimationFrame(this.render);
@@ -347,15 +387,15 @@ export default {
 
             barrage.x -= this.speed;
 
-            if (barrage.x <= this.containerWidth + this.speed * 20) {
+            if (barrage.x <= this.canvasRealWidth + this.radius + this.realChannelGap + this.speed) {
               // 弹幕显示
               this.drawRoundRect(
                 this.ctx,
                 barrage.bgColor,
                 barrage.x - this.radius - this.halfBorderWidth, // x
-                i * (this.barrageHeight + this.channelGap) - this.halfBorderWidth + this.paddingTop, // y
+                i * (this.realBarrageHeight + this.realChannelGap) - this.halfBorderWidth + this.realPaddingTop, // y
                 barrage.width + this.diameter + this.halfBorderWidth * 2, // width
-                this.barrageHeight + this.halfBorderWidth * 2, // height
+                this.realBarrageHeight + this.halfBorderWidth * 2, // height
                 this.radius + this.halfBorderWidth, // radius
               );
 
@@ -363,9 +403,9 @@ export default {
                 this.drawRoundRectBorder(
                   this.ctx,
                   barrage.x - this.radius, // x
-                  this.paddingTop + i * (this.barrageHeight + this.channelGap), // y
+                  this.realPaddingTop + i * (this.realBarrageHeight + this.realChannelGap), // y
                   barrage.width + this.diameter, // width
-                  this.barrageHeight, // height
+                  this.realBarrageHeight, // height
                   this.radius, // radius
                   barrage.borderColor || this.borderColor
                 );
@@ -374,17 +414,17 @@ export default {
               this.ctx.fillStyle = `${barrage.color}`;
               this.ctx.fillText(
                 barrage.content,
-                barrage.x + (barrage.icon ? (barrage.iconR * 2 + this.iconTextDistance): 0),
-                i * (this.barrageHeight + this.channelGap) + this.paddingTop + (this.barrageHeight - this.innerFontSize) / 2 + this.innerFontSize / 6 * 5,
+                barrage.x + (barrage.icon ? (barrage.iconR * 2 + this.realIconTextDistance): 0),
+                i * (this.realBarrageHeight + this.realChannelGap) + this.realPaddingTop + (this.realBarrageHeight - this.realFontSize) / 2 + this.realFontSize / 6 * 5,
               );
               this.ctx.fillStyle = `${barrage.countColor || barrage.color}`;
               if (barrage.count) {
                 this.ctx.fillText(
                   ` ${timesIconUTF8}${barrage.count}`,
                   barrage.x +
-                    (barrage.icon ? (barrage.iconR * 2 + this.iconTextDistance) : 0) +
+                    (barrage.icon ? (barrage.iconR * 2 + this.realIconTextDistance) : 0) +
                     barrage.contentWidth,
-                    i * (this.barrageHeight + this.channelGap) + this.paddingTop + (this.barrageHeight - this.innerFontSize) / 2 + this.innerFontSize / 6 * 5,
+                    i * (this.realBarrageHeight + this.realChannelGap) + this.realPaddingTop + (this.realBarrageHeight - this.realFontSize) / 2 + this.realFontSize / 6 * 5,
                 );
               }
               if (barrage.icon) {
@@ -392,7 +432,7 @@ export default {
                   this.ctx,
                   barrage.icon,
                   barrage.x - barrage.iconR, // x
-                  i * (this.barrageHeight + this.channelGap) + this.paddingTop + this.barrageHeight / 2, // y
+                  i * (this.realBarrageHeight + this.realChannelGap) + this.realPaddingTop + this.realBarrageHeight / 2, // y
                   barrage.iconR // iconR
                 );
               }
@@ -400,14 +440,14 @@ export default {
                 this.originImg(
                   this.ctx,
                   barrage.tagImage,
-                  barrage.x - this.barrageHeight - 10,
-                  i * (this.barrageHeight + this.channelGap) + this.channelGap,
-                  this.barrageHeight,
-                  this.barrageHeight
+                  barrage.x - this.realBarrageHeight - 10,
+                  i * (this.realBarrageHeight + this.realChannelGap) + this.realChannelGap,
+                  this.realBarrageHeight,
+                  this.realBarrageHeight
                 );
               }
             }
-            if (barrage.x < -(barrage.width + this.barrageHeight)) {
+            if (barrage.x < -(barrage.width + this.realBarrageHeight)) {
               // 弹幕删除
               let arr = this.channelsArray.reduce((a, b) => a.concat(b));
               if (this.loop) {
@@ -422,14 +462,14 @@ export default {
             }
             // 弹幕插入时机判断
             if (
+              j === this.channelsArray[i].length - 1 &&
+              this.barrageArray.length !== 0 &&
               barrage.x <=
-                Math.floor(this.containerWidth - barrage.width - this.channelGap) &&
+                Math.floor(this.canvasRealWidth - barrage.width - this.radius) &&
               barrage.x >=
                 Math.floor(
-                  this.containerWidth - barrage.width - this.channelGap - this.speed
-                ) &&
-              j === this.channelsArray[i].length - 1 &&
-              this.barrageArray.length !== 0
+                  this.canvasRealWidth - barrage.width - this.radius - this.speed
+                )
             ) {
               let item = this.barrageArray.shift();
               this.channelsArray[i].push(item);
@@ -465,7 +505,7 @@ export default {
         (e) => {
           const p = this.getEventPosition(e);
           let channelIndex = Math.floor(
-            p.y / (this.barrageHeight + this.innerFontSize)
+            p.y / (this.realBarrageHeight + this.realFontSize)
           );
           const tempArray = JSON.parse(
             JSON.stringify(this.channelsArray[channelIndex])
@@ -501,7 +541,7 @@ export default {
     },
     // 判断某个弹幕是否已经滚出了屏幕
     checkSingleBarrageStatus(barrage) {
-      return barrage.x < -(barrage.width + this.barrageHeight);
+      return barrage.x < -(barrage.width + this.realBarrageHeight);
     },
     /**
      * 判断所有的弹幕是否滚动完成
@@ -619,7 +659,7 @@ export default {
      */
     drawRoundRectBorder(context, x, y, width, height, radius, borderColor) {
       context.beginPath();
-      context.lineWidth = this.borderWidth;
+      context.lineWidth = this.realBorderWidth;
       context.strokeStyle = borderColor;
       context.arc(x + radius, y + radius, radius, Math.PI, (Math.PI * 3) / 2);
       context.lineTo(width - radius + x, y);

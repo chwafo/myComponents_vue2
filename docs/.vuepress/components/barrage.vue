@@ -1,6 +1,11 @@
 <template>
   <div>
-    <barrage :barrageList="barrageList" />
+    <barrage
+      :barrageList="barrageList"
+      :canvasDisplayWidth="400"
+      :canvasDisplayHeight="300"
+      :circleLoop="true"
+    />
     <button @click="handleStart">开始</button>
   </div>
 </template>
@@ -21,13 +26,14 @@ export default {
   methods: {
     getBarrageList() {
       let arr = [];
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 6; i++) {
         arr.push({
           id: i,
           count: 10,
           content: "啦啦啦啦" + i,
           color: "#fff",
           bgColor: "#000",
+          borderColor: "yellow",
         });
       }
 
@@ -35,7 +41,7 @@ export default {
     },
     handleStart() {
       this.barrageList = this.getBarrageList();
-      console.log(this.barrageList)
+      console.log(this.barrageList);
     },
   },
 };
