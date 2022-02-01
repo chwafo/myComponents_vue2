@@ -123,6 +123,7 @@ export default {
       containerHeight: 0,
       channelsArray: [],
       barrageChannels: 1,
+      running: false,
     };
   },
   computed: {
@@ -185,7 +186,6 @@ export default {
           this.barrageQueue = JSON.parse(JSON.stringify(val));
           this.newBarrageArray = JSON.parse(JSON.stringify(val));
           this.initData();
-          window.requestAnimationFrame(this.render);
         }
       },
       immediate: true,
@@ -320,14 +320,25 @@ export default {
         }
       }
     },
+    start() {
+      if(!this.running) {
+        this.running = true;
+        window.requestAnimationFrame(this.render);
+      }
+    },
+    stop() {
+      this.running = false;
+    },
     /**
      * 渲染
      */
     render() {
-      this.ctx.clearRect(0, 0, this.canvasRealWidth, this.canvasRealHeight);
-      this.ctx.font = this.font;
-      this.draw();
-      window.requestAnimationFrame(this.render);
+      if(this.running) {
+        this.ctx.clearRect(0, 0, this.canvasRealWidth, this.canvasRealHeight);
+        this.ctx.font = this.font;
+        this.draw();
+        window.requestAnimationFrame(this.render);
+      }
     },
     getChannelDelay(channelIndex) {
       return this.channelsDelay[channelIndex] || 0;
@@ -354,33 +365,18 @@ export default {
         }
       }
     },
-    // 弹幕循环数据处理
-    removeUnavailableBarragefromChannels() {
-      for (let i = 0; i < this.channelsArray.length; i++) {
-        const nowChannels = this.channelsArray[i];
-        while (
-          nowChannels[0] &&
-          this.checkSingleBarrageStatus(nowChannels[0])
-        ) {
-          const nowBarrage = nowChannels.shift();
-          if (this.circleLoop) {
-            nowBarrage.x = this.barrageInitX;
-            this.barrageArray.push(nowBarrage);
-          }
-        }
-      }
-    },
     draw() {
       for (let i = 0; i < this.channelsArray.length; i++) {
-        if (this.channelsArray[i].length === 0) {
+        const nowChannel = this.channelsArray[i];
+        if (nowChannel.length === 0) {
           let item = this.barrageArray.shift();
           if (item) {
-            this.channelsArray[i].push(item);
+            nowChannel.push(item);
           }
         }
-        for (let j = 0; j < this.channelsArray[i].length; j++) {
+        for (let j = 0; j < nowChannel.length; j++) {
           try {
-            let barrage = this.channelsArray[i][j];
+            let barrage = nowChannel[j];
             if (j === 0 && !this.canStart(i)) {
               break;
             }
@@ -447,19 +443,7 @@ export default {
                 );
               }
             }
-            if (barrage.x < -(barrage.width + this.realBarrageHeight)) {
-              // 弹幕删除
-              let arr = this.channelsArray.reduce((a, b) => a.concat(b));
-              if (this.loop) {
-                if (this.checkBarrageStatus(arr)) {
-                  this.barrageQueue = [];
-                  this.barrageQueue = JSON.parse(
-                    JSON.stringify(this.newBarrageArray)
-                  );
-                  this.initData();
-                }
-              }
-            }
+            
             // 弹幕插入时机判断
             if (
               j === this.channelsArray[i].length - 1 &&
@@ -478,8 +462,29 @@ export default {
             console.log(e);
           }
         }
+
+        for(let j = nowChannel.length - 1; j >= 0; j--) {
+          const nowBarrage = nowChannel[j];
+          if(this.isBarrageOutOfScreen(nowBarrage)) {
+              nowChannel.splice(j, 1);
+              if(this.loop) {
+                if(this.circleLoop) {
+                  console.log(3333);
+                  nowBarrage.x = this.barrageInitX;
+                  this.barrageArray.push(nowBarrage);
+                } else {
+                  if(this.isChannelsArrayEmpty()) {
+                    this.barrageQueue = [];
+                    this.barrageQueue = JSON.parse(
+                      JSON.stringify(this.newBarrageArray)
+                    );
+                    this.initData();
+                  }
+                }
+              }
+            }
+        }
       }
-      this.removeUnavailableBarragefromChannels();
     },
     /**
      * 重置数据
@@ -540,8 +545,12 @@ export default {
       return { x: 2 * x, y: 2 * y };
     },
     // 判断某个弹幕是否已经滚出了屏幕
-    checkSingleBarrageStatus(barrage) {
+    isBarrageOutOfScreen(barrage) {
       return barrage.x < -(barrage.width + this.realBarrageHeight);
+    },
+    isChannelsArrayEmpty() {
+      let arr = this.channelsArray.reduce((a, b) => a.concat(b));
+      return arr.length === 0;
     },
     /**
      * 判断所有的弹幕是否滚动完成

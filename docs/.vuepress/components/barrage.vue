@@ -4,9 +4,11 @@
       :barrageList="barrageList"
       :canvasDisplayWidth="400"
       :canvasDisplayHeight="300"
-      :circleLoop="true"
+      :circleLoop="false"
+      ref="barrage"
     />
     <button @click="handleStart">开始</button>
+    <button @click="handleStop">停止</button>
   </div>
 </template>
 
@@ -40,10 +42,16 @@ export default {
       return arr;
     },
     handleStart() {
-      this.barrageList = this.getBarrageList();
+      this.$refs.barrage && this.$refs.barrage.start();
       console.log(this.barrageList);
     },
+    handleStop() {
+      this.$refs.barrage && this.$refs.barrage.stop();
+    }
   },
+  mounted() {
+    this.barrageList = this.getBarrageList();
+  }
 };
 </script>
 
