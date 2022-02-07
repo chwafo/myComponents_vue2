@@ -1,10 +1,12 @@
 <template>
   <div>
     <barrage
-      :barrageList="barrageList"
       :canvasDisplayWidth="400"
       :canvasDisplayHeight="300"
-      :circleLoop="false"
+      :circleLoop="true"
+      :channels="4"
+      :speed="5"
+      :barrageGap="20"
       ref="barrage"
     />
     <button @click="handleStart">开始</button>
@@ -50,7 +52,7 @@ export default {
     }
   },
   mounted() {
-    this.barrageList = this.getBarrageList();
+    this.$refs.barrage && (this.$refs.barrage.setBarrageList(this.getBarrageList()));
   }
 };
 </script>

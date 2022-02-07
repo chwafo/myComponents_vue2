@@ -40,10 +40,6 @@ export default {
       type: Number,
       default: 0,
     },
-    barrageList: {
-      type: Array,
-      default: () => [],
-    },
     speed: {
       type: Number,
       default: 4,
@@ -116,6 +112,7 @@ export default {
     return {
       ctx: null,
       ctx1: null,
+      barrageList: [],
       newBarrageArray: [], // 新增弹幕之后的总弹幕
       barrageArray: [],
       barrageQueue: [],
@@ -163,7 +160,6 @@ export default {
       }, 0);
     },
     barrageInitX() {
-      // return this.canvasRealWidth + this.realBarrageHeight;
       return this.canvasRealWidth + this.radius + this.realBarrageGap;
     },
     realFontSize() {
@@ -179,18 +175,6 @@ export default {
       return this.diameter / 2;
     },
   },
-  watch: {
-    barrageList: {
-      handler(val) {
-        if (val.length !== 0) {
-          this.barrageQueue = JSON.parse(JSON.stringify(val));
-          this.newBarrageArray = JSON.parse(JSON.stringify(val));
-          this.initData();
-        }
-      },
-      immediate: true,
-    },
-  },
   mounted() {
     this.init();
   },
@@ -199,12 +183,23 @@ export default {
       this.containerWidth = this.$refs.container.innerWidth;
       this.containerHeight = this.$refs.container.innerHeight;
       const maxChannels = Math.floor(
-        (this.canvasRealHeight - this.realPaddingTop) / (this.realBarrageHeight + this.realChannelGap)
+        (this.canvasRealHeight - this.realPaddingTop) /
+          (this.realBarrageHeight + this.realChannelGap)
       ); // 总高度对应的轨道
-      this.barrageChannels = this.channels ? (maxChannels < this.channels ? maxChannels : this.channels) : maxChannels;
+      this.barrageChannels = this.channels
+        ? maxChannels < this.channels
+          ? maxChannels
+          : this.channels
+        : maxChannels;
       this.ctx = this.$refs.canvas.getContext("2d");
       this.ctx1 = this.$refs.canvasMeasure.getContext("2d");
       this.barrageClickEvent();
+    },
+    setBarrageList(barrageList) {
+      this.barrageList = barrageList;
+      this.barrageQueue = JSON.parse(JSON.stringify(barrageList));
+      this.newBarrageArray = JSON.parse(JSON.stringify(barrageList));
+      this.initData();
     },
     measureText(text = "") {
       this.ctx1.font = this.font;
@@ -262,8 +257,10 @@ export default {
       }
 
       const width =
-        contentWidth + (barrage.icon ? barrage.iconR * 2 + this.realIconTextDistance : 0) + countWidth;
-        console.log('contentWidth', contentWidth);
+        contentWidth +
+        (barrage.icon ? barrage.iconR * 2 + this.realIconTextDistance : 0) +
+        countWidth;
+      console.log("contentWidth", contentWidth);
       return {
         width,
         contentWidth,
@@ -272,14 +269,9 @@ export default {
     calcBarrageInfo(obj) {
       let content = this.dealStr(obj.content);
       let img = null;
-      let tagImg = null;
       if (obj.icon) {
         img = new Image();
         img.src = obj.icon;
-      }
-      if (obj.tagImage) {
-        tagImg = new Image();
-        tagImg.src = obj.tagImage;
       }
 
       return {
@@ -289,7 +281,6 @@ export default {
         x: this.barrageInitX,
         icon: obj.icon ? img : "",
         iconR: obj.iconR,
-        tagImage: obj.tagImage ? tagImg : "",
         ...this.calcBarrageWidth(obj),
         color: obj.color || "#FFFFFF",
         bgColor: obj.bgColor || "rgba(0,0,0,0.4)",
@@ -321,7 +312,7 @@ export default {
       }
     },
     start() {
-      if(!this.running) {
+      if (!this.running) {
         this.running = true;
         window.requestAnimationFrame(this.render);
       }
@@ -333,7 +324,7 @@ export default {
      * 渲染
      */
     render() {
-      if(this.running) {
+      if (this.running) {
         this.ctx.clearRect(0, 0, this.canvasRealWidth, this.canvasRealHeight);
         this.ctx.font = this.font;
         this.draw();
@@ -368,121 +359,136 @@ export default {
     draw() {
       for (let i = 0; i < this.channelsArray.length; i++) {
         const nowChannel = this.channelsArray[i];
-        if (nowChannel.length === 0) {
-          let item = this.barrageArray.shift();
-          if (item) {
-            nowChannel.push(item);
+
+        // 处理超出可视区域的弹幕
+        let firstBarrage = nowChannel[0];
+        while (firstBarrage && this.isBarrageOutOfScreen(firstBarrage)) {
+          nowChannel.shift(); // 移除弹幕
+          if (this.loop) {
+            if (this.circleLoop) {
+              firstBarrage.x = this.barrageInitX;
+              this.barrageArray.push(firstBarrage);
+            } else {
+              if (
+                this.barrageArray.length === 0 &&
+                this.isChannelsArrayEmpty()
+              ) {
+                this.barrageQueue = [];
+                this.barrageQueue = JSON.parse(
+                  JSON.stringify(this.newBarrageArray)
+                );
+                this.initData();
+              }
+            }
+          }
+
+          firstBarrage = nowChannel[0];
+        }
+
+        // 弹幕插入时机判断
+        const lastBarrage = nowChannel[nowChannel.length - 1]; // 该频道的最后一个弹幕
+        if (lastBarrage) {
+          if (
+            this.barrageArray.length !== 0 &&
+            lastBarrage.x - this.speed <=
+              this.canvasRealWidth - lastBarrage.width - this.radius
+          ) {
+            let newBarrage = this.barrageArray.shift();
+            newBarrage.x =
+              lastBarrage.x +
+              lastBarrage.width +
+              this.diameter +
+              this.realBarrageGap;
+            if(this.barrageInitX > newBarrage.x) {
+              newBarrage.x = this.barrageInitX;
+            }
+            nowChannel.push(newBarrage);
+          }
+        } else {
+          let newBarrage = this.barrageArray.shift();
+          if (newBarrage) {
+            nowChannel.push(newBarrage);
           }
         }
+
+        // 绘制弹幕
         for (let j = 0; j < nowChannel.length; j++) {
           try {
-            let barrage = nowChannel[j];
             if (j === 0 && !this.canStart(i)) {
               break;
             }
 
-            barrage.x -= this.speed;
+            const barrage = nowChannel[j];
+            // 弹幕显示
+            this.drawRoundRect(
+              this.ctx,
+              barrage.bgColor,
+              barrage.x - this.radius - this.halfBorderWidth, // x
+              i * (this.realBarrageHeight + this.realChannelGap) -
+                this.halfBorderWidth +
+                this.realPaddingTop, // y
+              barrage.width + this.diameter + this.halfBorderWidth * 2, // width
+              this.realBarrageHeight + this.halfBorderWidth * 2, // height
+              this.radius + this.halfBorderWidth // radius
+            );
 
-            if (barrage.x <= this.canvasRealWidth + this.radius + this.realChannelGap + this.speed) {
-              // 弹幕显示
-              this.drawRoundRect(
+            if (barrage.borderColor || this.borderColor) {
+              this.drawRoundRectBorder(
                 this.ctx,
-                barrage.bgColor,
-                barrage.x - this.radius - this.halfBorderWidth, // x
-                i * (this.realBarrageHeight + this.realChannelGap) - this.halfBorderWidth + this.realPaddingTop, // y
-                barrage.width + this.diameter + this.halfBorderWidth * 2, // width
-                this.realBarrageHeight + this.halfBorderWidth * 2, // height
-                this.radius + this.halfBorderWidth, // radius
+                barrage.x - this.radius, // x
+                this.realPaddingTop +
+                  i * (this.realBarrageHeight + this.realChannelGap), // y
+                barrage.width + this.diameter, // width
+                this.realBarrageHeight, // height
+                this.radius, // radius
+                barrage.borderColor || this.borderColor
               );
+            }
 
-              if (barrage.borderColor || this.borderColor) {
-                this.drawRoundRectBorder(
-                  this.ctx,
-                  barrage.x - this.radius, // x
-                  this.realPaddingTop + i * (this.realBarrageHeight + this.realChannelGap), // y
-                  barrage.width + this.diameter, // width
-                  this.realBarrageHeight, // height
-                  this.radius, // radius
-                  barrage.borderColor || this.borderColor
-                );
-              }
-
-              this.ctx.fillStyle = `${barrage.color}`;
+            this.ctx.fillStyle = `${barrage.color}`;
+            this.ctx.fillText(
+              barrage.content,
+              barrage.x +
+                (barrage.icon
+                  ? barrage.iconR * 2 + this.realIconTextDistance
+                  : 0),
+              i * (this.realBarrageHeight + this.realChannelGap) +
+                this.realPaddingTop +
+                (this.realBarrageHeight - this.realFontSize) / 2 +
+                (this.realFontSize / 6) * 5
+            );
+            this.ctx.fillStyle = `${barrage.countColor || barrage.color}`;
+            if (barrage.count) {
               this.ctx.fillText(
-                barrage.content,
-                barrage.x + (barrage.icon ? (barrage.iconR * 2 + this.realIconTextDistance): 0),
-                i * (this.realBarrageHeight + this.realChannelGap) + this.realPaddingTop + (this.realBarrageHeight - this.realFontSize) / 2 + this.realFontSize / 6 * 5,
+                ` ${timesIconUTF8}${barrage.count}`,
+                barrage.x +
+                  (barrage.icon
+                    ? barrage.iconR * 2 + this.realIconTextDistance
+                    : 0) +
+                  barrage.contentWidth,
+                i * (this.realBarrageHeight + this.realChannelGap) +
+                  this.realPaddingTop +
+                  (this.realBarrageHeight - this.realFontSize) / 2 +
+                  (this.realFontSize / 6) * 5
               );
-              this.ctx.fillStyle = `${barrage.countColor || barrage.color}`;
-              if (barrage.count) {
-                this.ctx.fillText(
-                  ` ${timesIconUTF8}${barrage.count}`,
-                  barrage.x +
-                    (barrage.icon ? (barrage.iconR * 2 + this.realIconTextDistance) : 0) +
-                    barrage.contentWidth,
-                    i * (this.realBarrageHeight + this.realChannelGap) + this.realPaddingTop + (this.realBarrageHeight - this.realFontSize) / 2 + this.realFontSize / 6 * 5,
-                );
-              }
-              if (barrage.icon) {
-                this.circleImg(
-                  this.ctx,
-                  barrage.icon,
-                  barrage.x - barrage.iconR, // x
-                  i * (this.realBarrageHeight + this.realChannelGap) + this.realPaddingTop + this.realBarrageHeight / 2, // y
-                  barrage.iconR // iconR
-                );
-              }
-              if (barrage.tagImage) {
-                this.originImg(
-                  this.ctx,
-                  barrage.tagImage,
-                  barrage.x - this.realBarrageHeight - 10,
-                  i * (this.realBarrageHeight + this.realChannelGap) + this.realChannelGap,
-                  this.realBarrageHeight,
-                  this.realBarrageHeight
-                );
-              }
             }
-            
-            // 弹幕插入时机判断
-            if (
-              j === this.channelsArray[i].length - 1 &&
-              this.barrageArray.length !== 0 &&
-              barrage.x <=
-                Math.floor(this.canvasRealWidth - barrage.width - this.radius) &&
-              barrage.x >=
-                Math.floor(
-                  this.canvasRealWidth - barrage.width - this.radius - this.speed
-                )
-            ) {
-              let item = this.barrageArray.shift();
-              this.channelsArray[i].push(item);
+            if (barrage.icon) {
+              this.circleImg(
+                this.ctx,
+                barrage.icon,
+                barrage.x - barrage.iconR, // x
+                i * (this.realBarrageHeight + this.realChannelGap) +
+                  this.realPaddingTop +
+                  this.realBarrageHeight / 2, // y
+                barrage.iconR // iconR
+              );
             }
+
+            barrage.x -= this.speed;
+            // }
           } catch (e) {
             console.log(e);
           }
-        }
-
-        for(let j = nowChannel.length - 1; j >= 0; j--) {
-          const nowBarrage = nowChannel[j];
-          if(this.isBarrageOutOfScreen(nowBarrage)) {
-              nowChannel.splice(j, 1);
-              if(this.loop) {
-                if(this.circleLoop) {
-                  console.log(3333);
-                  nowBarrage.x = this.barrageInitX;
-                  this.barrageArray.push(nowBarrage);
-                } else {
-                  if(this.isChannelsArrayEmpty()) {
-                    this.barrageQueue = [];
-                    this.barrageQueue = JSON.parse(
-                      JSON.stringify(this.newBarrageArray)
-                    );
-                    this.initData();
-                  }
-                }
-              }
-            }
         }
       }
     },
@@ -546,7 +552,7 @@ export default {
     },
     // 判断某个弹幕是否已经滚出了屏幕
     isBarrageOutOfScreen(barrage) {
-      return barrage.x < -(barrage.width + this.realBarrageHeight);
+      return barrage.x <= -(barrage.width + this.diameter);
     },
     isChannelsArrayEmpty() {
       let arr = this.channelsArray.reduce((a, b) => a.concat(b));
