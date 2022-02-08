@@ -378,6 +378,7 @@ export default {
                   JSON.stringify(this.newBarrageArray)
                 );
                 this.initData();
+                return;
               }
             }
           }
