@@ -260,7 +260,6 @@ export default {
         contentWidth +
         (barrage.icon ? barrage.iconR * 2 + this.realIconTextDistance : 0) +
         countWidth;
-      console.log("contentWidth", contentWidth);
       return {
         width,
         contentWidth,
@@ -400,7 +399,7 @@ export default {
               lastBarrage.width +
               this.diameter +
               this.realBarrageGap;
-            if(this.barrageInitX > newBarrage.x) {
+            if (this.barrageInitX > newBarrage.x) {
               newBarrage.x = this.barrageInitX;
             }
             nowChannel.push(newBarrage);
@@ -421,27 +420,38 @@ export default {
 
             const barrage = nowChannel[j];
             // 弹幕显示
+            // this.drawRoundRect(
+            //   this.ctx,
+            //   barrage.bgColor,
+            //   barrage.x - this.radius - this.halfBorderWidth, // x
+            //   i * (this.realBarrageHeight + this.realChannelGap) -
+            //     this.halfBorderWidth +
+            //     this.realPaddingTop, // y
+            //   barrage.width + this.diameter + this.halfBorderWidth * 2, // width
+            //   this.realBarrageHeight + this.halfBorderWidth * 2, // height
+            //   this.radius + this.halfBorderWidth // radius
+            // );
             this.drawRoundRect(
               this.ctx,
               barrage.bgColor,
-              barrage.x - this.radius - this.halfBorderWidth, // x
-              i * (this.realBarrageHeight + this.realChannelGap) -
-                this.halfBorderWidth +
+              barrage.x - this.radius, // x
+              i * (this.realBarrageHeight + this.realChannelGap) +
                 this.realPaddingTop, // y
-              barrage.width + this.diameter + this.halfBorderWidth * 2, // width
-              this.realBarrageHeight + this.halfBorderWidth * 2, // height
-              this.radius + this.halfBorderWidth // radius
+              barrage.width + this.diameter, // width
+              this.realBarrageHeight, // height
+              this.radius // radius
             );
 
             if (barrage.borderColor || this.borderColor) {
               this.drawRoundRectBorder(
                 this.ctx,
-                barrage.x - this.radius, // x
+                barrage.x - this.radius + this.halfBorderWidth, // x
                 this.realPaddingTop +
-                  i * (this.realBarrageHeight + this.realChannelGap), // y
-                barrage.width + this.diameter, // width
-                this.realBarrageHeight, // height
-                this.radius, // radius
+                  i * (this.realBarrageHeight + this.realChannelGap) +
+                  this.halfBorderWidth, // y
+                barrage.width + this.diameter - this.halfBorderWidth * 2, // width
+                this.realBarrageHeight - this.halfBorderWidth * 2, // height
+                this.radius - this.halfBorderWidth, // radius
                 barrage.borderColor || this.borderColor
               );
             }
@@ -515,27 +525,57 @@ export default {
       document.getElementById("canvas").addEventListener(
         "click",
         (e) => {
+          console.log(e);
           const p = this.getEventPosition(e);
-          let channelIndex = Math.floor(
-            p.y / (this.realBarrageHeight + this.realFontSize)
-          );
-          const tempArray = JSON.parse(
-            JSON.stringify(this.channelsArray[channelIndex])
-          );
-          for (let i = 0; i < tempArray.length; i++) {
-            let channelItemArray = tempArray[i];
-            if (
-              p.x > channelItemArray.x &&
-              p.x < channelItemArray.x + channelItemArray.width
-            ) {
-              if (channelItemArray.id) {
-                this.$emit("doLike", channelItemArray.id);
+          const channelIndex =
+            Math.ceil(
+              (p.y - this.realPaddingTop) /
+                (this.realBarrageHeight + this.realChannelGap)
+            ) - 1;
+          if (
+            this.channelsArray.length > channelIndex &&
+            p.y -
+              (this.realBarrageHeight + this.realChannelGap) * channelIndex -
+              this.realPaddingTop <=
+              this.realBarrageHeight
+          ) {
+            const tempArray = JSON.parse(
+              JSON.stringify(this.channelsArray[channelIndex])
+            );
+            for (let i = 0; i < tempArray.length; i++) {
+              let item = tempArray[i];
+              if (this.isPointInBarrage(p, item, channelIndex)) {
+                if (item.id) {
+                  this.$emit("doLike", item.id);
+                }
+                break;
               }
             }
           }
         },
         false
       );
+    },
+    // 点是否在弹幕内部
+    isPointInBarrage({ x, y }, barrage, channelIndex) {
+      const barrageRectRight = barrage.x + barrage.width;
+      const cY =
+        this.realPaddingTop +
+        channelIndex * (this.realBarrageHeight + this.realChannelGap) +
+        this.realBarrageHeight / 2;
+      return (
+        (x >= barrage.x && x <= barrageRectRight) ||
+        this.isPointInCircle({ x, y }, { cX: barrage.x, cY }, this.radius) ||
+        this.isPointInCircle(
+          { x, y },
+          { cX: barrageRectRight, cY },
+          this.radius
+        )
+      );
+    },
+    // 点是否在圆内
+    isPointInCircle({ x, y }, { cX, cY }, radius) {
+      return radius >= Math.sqrt((x - cX) * (x - cX) + (y - cY) * (y - cY));
     },
     /**
      * 获取点击位置
@@ -549,7 +589,7 @@ export default {
         x = ev.offsetX;
         y = ev.offsetY;
       }
-      return { x: 2 * x, y: 2 * y };
+      return { x: this.scale * x, y: this.scale * y };
     },
     // 判断某个弹幕是否已经滚出了屏幕
     isBarrageOutOfScreen(barrage) {
@@ -711,7 +751,6 @@ export default {
 
 <style lang="css" scoped>
 .z_barrage-container {
-  pointer-events: none;
   position: relative;
 }
 .z_container {
