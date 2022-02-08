@@ -6,7 +6,7 @@
       :height="canvasRealHeight"
       style="display: none"
     />
-    <div class="z_container" :style="{ height: canvasDisplayHeight + 'px' }">
+    <div class="z_container">
       <canvas
         id="canvas"
         ref="canvas"
@@ -14,8 +14,8 @@
         :width="canvasRealWidth"
         :height="canvasRealHeight"
         :style="{
-          width: canvasDisplayWidth + 'px',
-          height: canvasDisplayHeight + 'px',
+          width: canvasDisplayWidth || containerWidth  + 'px',
+          height: canvasDisplayHeight || containerHeight + 'px',
         }"
       />
     </div>
@@ -107,6 +107,10 @@ export default {
       type: Number,
       default: 10,
     },
+    iconR: {
+      type: [Number],
+      default: 10,
+    },
   },
   data() {
     return {
@@ -174,14 +178,17 @@ export default {
     radius() {
       return this.diameter / 2;
     },
+    realSpeed() {
+      return this.speed * this.scale;
+    },
   },
   mounted() {
     this.init();
   },
   methods: {
     init() {
-      this.containerWidth = this.$refs.container.innerWidth;
-      this.containerHeight = this.$refs.container.innerHeight;
+      this.containerWidth = this.$refs.container.clientWidth;
+      this.containerHeight = this.$refs.container.clientHeight;
       const maxChannels = Math.floor(
         (this.canvasRealHeight - this.realPaddingTop) /
           (this.realBarrageHeight + this.realChannelGap)
@@ -271,6 +278,7 @@ export default {
       if (obj.icon) {
         img = new Image();
         img.src = obj.icon;
+        obj.iconR = (obj.iconR || this.iconR) * this.scale;
       }
 
       return {
@@ -390,7 +398,7 @@ export default {
         if (lastBarrage) {
           if (
             this.barrageArray.length !== 0 &&
-            lastBarrage.x - this.speed <=
+            lastBarrage.x - this.realSpeed <=
               this.canvasRealWidth - lastBarrage.width - this.radius
           ) {
             let newBarrage = this.barrageArray.shift();
@@ -495,7 +503,7 @@ export default {
               );
             }
 
-            barrage.x -= this.speed;
+            barrage.x -= this.realSpeed;
             // }
           } catch (e) {
             console.log(e);
@@ -546,7 +554,7 @@ export default {
               let item = tempArray[i];
               if (this.isPointInBarrage(p, item, channelIndex)) {
                 if (item.id) {
-                  this.$emit("doLike", item.id);
+                  this.$emit("doLike", item);
                 }
                 break;
               }
@@ -755,6 +763,7 @@ export default {
 }
 .z_container {
   width: 100%;
+  height: 100%;
   overflow: hidden;
 }
 .z_barrage {
