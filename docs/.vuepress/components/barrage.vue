@@ -1,13 +1,14 @@
 <template>
   <div>
     <barrage
-      :canvasDisplayWidth="400"
-      :canvasDisplayHeight="300"
       :circleLoop="true"
-      :channels="4"
-      :speed="5"
+      :speed="2"
       :barrageGap="20"
+      :channelsDelay="[100, 0, 200, 300]"
+      :borderWidth="2"
       ref="barrage"
+      @doLike="handleDoLike"
+      class="barrageExample"
     />
     <button @click="handleStart">开始</button>
     <button @click="handleStop">停止</button>
@@ -30,7 +31,7 @@ export default {
   methods: {
     getBarrageList() {
       let arr = [];
-      for (let i = 0; i < 6; i++) {
+      for (let i = 0; i < 4; i++) {
         arr.push({
           id: i,
           count: 10,
@@ -38,6 +39,8 @@ export default {
           color: "#fff",
           bgColor: "#000",
           borderColor: "yellow",
+          icon: require('../../../assets/img/icon_hot.png'),
+          iconR: 10,
         });
       }
 
@@ -49,7 +52,11 @@ export default {
     },
     handleStop() {
       this.$refs.barrage && this.$refs.barrage.stop();
-    }
+    },
+    handleDoLike(barrage) {
+      this.handleStop();
+      console.log(barrage, barrage.id);
+    },
   },
   mounted() {
     this.$refs.barrage && (this.$refs.barrage.setBarrageList(this.getBarrageList()));
@@ -58,4 +65,9 @@ export default {
 </script>
 
 <style lang="css" scoped>
+.barrageExample {
+  border: 1px solid;
+  height: 400px;
+  width: 300px;
+}
 </style>
