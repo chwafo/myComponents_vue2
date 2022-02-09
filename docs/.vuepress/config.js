@@ -14,7 +14,8 @@ module.exports = {
   themeConfig: {
     sidebar: [
       '/',
-      ['/barrage', '弹幕']
+      ['/barrage', '弹幕'],
+      ['/lazyList', '下拉刷新列表'],
     ]
   }
 }
