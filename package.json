@@ -2,7 +2,7 @@
   "name": "@chwafo/components_vue2",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "./lib/index.js",
   "directories": {
     "doc": "doc"
   },

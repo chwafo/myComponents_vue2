@@ -5,9 +5,9 @@ module.exports = {
   mode: "production",
   entry: './components/index.js',
   output: {
-    filename: 'com_vue2.js',
+    filename: 'index.js',
     path: path.resolve(__dirname, '../lib'),
-    library: 'input-ui',
+    library: 'ccom_vue2',
     libraryExport: 'default',
     libraryTarget: 'umd'
   },
