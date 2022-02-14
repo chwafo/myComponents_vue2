@@ -24,7 +24,7 @@
     </van-list>
     <div class="lazyList_empty" v-if="!loading && list && list.length === 0">
       <slot name="empty">
-        <img src="../assets/img/nothing.png" />
+        <img src="../../assets/img/nothing.png" />
         <div class="emptyText">{{ emptyText }}</div>
       </slot>
     </div>
@@ -39,9 +39,10 @@ import { List, PullRefresh } from "vant";
 Vue.use(List);
 Vue.use(PullRefresh);
 
-import * as common from "../assets/utils/common.js";
+import * as common from "../../assets/utils/common.js";
 
 export default {
+  name: "lazyList",
   props: {
     pageSize: {
       type: [Number, String],

@@ -13,7 +13,7 @@
 </template>
 
 <script>
-import lasyList from "../../../components/lazyList.vue";
+import lasyList from "../../../../components/lazyList/index.js";
 export default {
   components: {
     lasyList,

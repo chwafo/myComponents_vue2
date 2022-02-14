@@ -43,7 +43,7 @@ export default {
           color: "#fff",
           bgColor: "#000",
           borderColor: "yellow",
-          icon: require('../../../assets/img/icon_hot.png'),
+          icon: require('../../assets/img/icon_hot.png'),
           iconR: 10,
         });
       }
