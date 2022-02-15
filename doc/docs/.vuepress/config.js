@@ -1,7 +1,7 @@
 const path = require('path');
 module.exports = {
   dest: path.resolve(__dirname, '../../../docs'),
-  base: "/myComponents_vue2.github.io/docs/",
+  base: "/",
   markdown: {
     title: '99999',
     description: '88888',
