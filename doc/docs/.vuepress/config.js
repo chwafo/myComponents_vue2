@@ -1,6 +1,7 @@
 const path = require('path');
 module.exports = {
   dest: path.resolve(__dirname, '../../../docs'),
+  base: "/docs/",
   markdown: {
     title: '99999',
     description: '88888',
